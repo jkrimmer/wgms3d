@@ -22,8 +22,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config.h"
-
 #include <type_traits>
 #include <stdexcept>
 #include <cstring>
@@ -193,9 +191,9 @@ namespace {
 	    PC pc;
 	    ierr = KSPGetPC(ksp, &pc); CHKERRXX(ierr);
 	    ierr = PCSetType(pc, PCLU); CHKERRXX(ierr);
-	    ierr = PCFactorSetMatSolverPackage(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
-//	    ierr = PCFactorSetMatSolverPackage(pc, MATSOLVERSUPERLU_DIST); CHKERRXX(ierr);
-//	    ierr = PCFactorSetMatSolverPackage(pc, MATSOLVERSUPERLU); CHKERRXX(ierr);
+	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
+//	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST); CHKERRXX(ierr);
+//	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU); CHKERRXX(ierr);
 
 	    // note: the default tolerance is 1e-8 instead of 1e-16. this has
 	    // led to incorrect mode fields for the degenerate fundamental
@@ -258,8 +256,8 @@ namespace {
 
 	    if(!xr)
 	    {
-		ierr = MatGetVecs(mat, &xr, PETSC_NULL); CHKERRXX(ierr);
-		ierr = MatGetVecs(mat, &xi, PETSC_NULL); CHKERRXX(ierr);
+		ierr = MatCreateVecs(mat, &xr, nullptr); CHKERRXX(ierr);
+		ierr = MatCreateVecs(mat, &xi, nullptr); CHKERRXX(ierr);
 		ierr = VecCreateSeq(PETSC_COMM_SELF, rank == 0 ? n : 0, &local_vector); CHKERRXX(ierr);
 	    }
 

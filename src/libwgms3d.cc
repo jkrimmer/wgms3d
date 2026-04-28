@@ -18,8 +18,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config.h"
-
 #include <iostream>
 #include <stdexcept>
 
@@ -28,10 +26,10 @@
 #include <boost/throw_exception.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 
-#ifdef HAVE_SLEPC
+#ifdef WGMS3D_WITH_SLEPC
 #include <slepcsys.h>
 #endif
-#if defined(HAVE_MPI) && defined(HAVE_PETSC)
+#if defined(WGMS3D_WITH_MPI) && defined(WGMS3D_WITH_PETSC)
 #include <mpi.h>
 #include <petscsys.h>
 #endif
@@ -73,7 +71,7 @@ namespace
 
 	auto wg = make_unique<wgms3d::ModeSolver>();
 
-#ifdef HAVE_SLEPC
+#ifdef WGMS3D_WITH_SLEPC
 	// don't want collisions with our own arguments, so we disable
 	// this for the moment:
 	//SlepcInitialize(&argc, &argv, (char*)0, nullptr);
@@ -81,13 +79,13 @@ namespace
 #endif
 
 	int rank = 0;
-#if defined(HAVE_MPI) && defined(HAVE_PETSC)
+#if defined(WGMS3D_WITH_MPI) && defined(WGMS3D_WITH_PETSC)
 	MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 	//std::cout << "We're rank " << rank << std::endl;
 #endif
 
 	if(rank == 0) {
-	    std::cout << "* wgms3d version " VERSION << " *" << std::endl;
+		 std::cout << "* wgms3d version " WGMS3D_VERSION_STR << " *" << std::endl;
 	}
 
 	while (1) {
@@ -384,7 +382,7 @@ namespace
 	// need to free all data before finalizing SLEPc:
 	wg.reset();
 
-#ifdef HAVE_SLEPC
+#ifdef WGMS3D_WITH_SLEPC
 	SlepcFinalize();
 #endif
 

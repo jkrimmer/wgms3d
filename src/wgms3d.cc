@@ -18,9 +18,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config.h"
-
-#if defined(HAVE_MPI) && defined(HAVE_PETSC)
+#if defined(WGMS3D_WITH_MPI) && defined(WGMS3D_WITH_PETSC)
 #include <mpi.h>
 #include <petscsys.h>
 #endif
@@ -28,6 +26,7 @@
 #include <complex>
 #include <list>
 #include <stdexcept>
+#include <algorithm>
 #include <cstring> // memset
 #include <numeric> // accumulate
 
@@ -544,8 +543,8 @@ namespace wgms3d {
 		const complex<double> onepxc2 = onepxc * onepxc;
 		complex<double> coeffs1[2*NSP];
 		complex<double> coeffs2[2*NSP];
-		std::memset(coeffs1, 0, sizeof(coeffs1));
-		std::memset(coeffs2, 0, sizeof(coeffs2));
+		std::fill_n(coeffs1, 2*NSP, complex<double>(0.0, 0.0));
+		std::fill_n(coeffs2, 2*NSP, complex<double>(0.0, 0.0));
 
 		/* Scalar Helmholtz operator: */
 		AXPY(2*NSP, onepxc2, M0 + 2, 2*NDO, coeffs1, 1);
@@ -677,7 +676,7 @@ namespace wgms3d {
 
 		if(which & 1) {
 		    dfm.vector_Hz_to_Er[gpn] = -Zkn2 / onepxc; /* h^z */
-		    std::memset(coeffs, 0, sizeof(coeffs));
+		    std::fill_n(coeffs, 2*NSP, complex<double>(0.0, 0.0));
 		    scale = +Zkn2 * onepxc;
 		    AXPY(2*NSP, scale, M0 + 3,       2*NDO, coeffs, 1); /* h^\rho_{\rho z} */
 		    AXPY(2*NSP, scale, M0 + NDO + 4, 2*NDO, coeffs, 1); /* h^z_{z z} */
@@ -690,7 +689,7 @@ namespace wgms3d {
 
 		if(which & 2) {
 		    dfm.vector_Hr_to_Ez[gpn] = Zkn2 / onepxc; /* h^\rho */
-		    std::memset(coeffs, 0, sizeof(coeffs));
+		    std::fill_n(coeffs, 2*NSP, complex<double>(0.0, 0.0));
 		    coeffs[0] = -Zkn2*sp->c*sp->c / onepxc; /* h^\rho */
 		    scale = -Zkn2 * onepxc;
 		    AXPY(2*NSP, scale, M0 + 2,       2*NDO, coeffs, 1); /* h^\rho_{\rho\rho} */
@@ -705,7 +704,7 @@ namespace wgms3d {
 		}
 
 		if(which & 4) {
-		    std::memset(coeffs, 0, sizeof(coeffs));
+		    std::fill_n(coeffs, 2*NSP, complex<double>(0.0, 0.0));
 		    scale = jay * Zkn2;
 		    AXPY(2*NSP, scale, M0 + 1,       2*NDO, coeffs, 1); /* h^\rho_z */
 		    scale *= -1.0;
@@ -716,7 +715,7 @@ namespace wgms3d {
 		}
 
 		if(which & 8) {
-		    std::memset(coeffs, 0, sizeof(coeffs));
+		    std::fill_n(coeffs, 2*NSP, complex<double>(0.0, 0.0));
 		    coeffs[0] = jay * sp->c; /* h^\rho */
 		    scale = jay * onepxc;
 		    AXPY(2*NSP, scale, M0 + 0,       2*NDO, coeffs, 1); /* h^\rho_\rho */
@@ -737,7 +736,7 @@ namespace wgms3d {
 	)
     {
 	int rank = 0;
-#if defined(HAVE_MPI)
+#if defined(WGMS3D_WITH_MPI)
 	MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 #endif
 
@@ -764,7 +763,7 @@ namespace wgms3d {
 		      << A->n << "; "
 		      << A->length << " non-zero entries." << std::endl;
 
-#if defined(HAVE_MPI)
+#if defined(WGMS3D_WITH_MPI)
 	    {
 		int n = A->n;
 		MPI_Bcast(&n, 1, MPI_INT, 0, PETSC_COMM_WORLD);
@@ -778,13 +777,13 @@ namespace wgms3d {
 	    std::cout << "Searching for modes near n_eff = "
 		      << near_this_effective_index << "." << std::endl;
 	    shift_invert_sigma = std::pow(sp->k0*near_this_effective_index, 2);
-#if defined(HAVE_MPI)
+#if defined(WGMS3D_WITH_MPI)
 	    MPI_Bcast(&shift_invert_sigma, 1, MPI_DOUBLE, 0, PETSC_COMM_WORLD);
 #endif
 	}
 	else
 	{
-#if defined(HAVE_MPI)
+#if defined(WGMS3D_WITH_MPI)
 	    // The non-root processes only need to know the matrix
 	    // dimension and the sigma.
 	    int n;
@@ -837,7 +836,7 @@ namespace wgms3d {
 	: number(number), beta(beta), sp(simulation_parameters)
     {
 	rank = 0;
-#if defined(HAVE_MPI)
+#if defined(WGMS3D_WITH_MPI)
 	MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 #endif
     }

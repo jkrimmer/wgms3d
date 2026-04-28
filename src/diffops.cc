@@ -76,7 +76,7 @@ namespace
     {
 	int i;
 
-	std::memset(M, 0, NV*NV*sizeof(M[0]));
+	std::fill_n(M, NV*NV, complex<double>(0.0, 0.0));
 
 	for(i = 0; i < NV; i += NF) { /* This is the same for the R and Z field components */
 	    M[0+i + (0+i)*NV] = 1.0;
@@ -222,7 +222,7 @@ namespace wgms3d {
 #error "make_curv_interface_matrix doesn't support NDO>5"
 #endif
 
-	std::memset(MLR, 0, NV*NV*sizeof(MLR[0]));
+	std::fill_n(MLR, NV*NV, complex<double>(0.0, 0.0));
 
 	/* Initialize diagonal entries to unity (= trivial interface
 	 * equations = no discontinuity) */
@@ -352,7 +352,7 @@ namespace wgms3d {
 	complex<double> *D = new complex<double>[N*N];
 	complex<double> *matrix = new complex<double>[N*N];
 
-	std::memset(matrix, 0, sizeof(matrix[0])*N*N);
+	std::fill_n(matrix, N*N, complex<double>(0.0, 0.0));
 	int i;
 	for(i = 0; i < N; i++) {
 	    matrix[i+i*N] = 1.0;
@@ -447,7 +447,7 @@ namespace wgms3d {
     {
 	int k;
 
-	std::memset(_stddiffop, 0, sizeof(_stddiffop));
+	std::fill_n(_stddiffop, sizeof(_stddiffop)/sizeof(_stddiffop[0]), complex<double>(0.0, 0.0));
 
 	for(k = 0; k < 2; k++) {
 #if NUM_GHOST_POINTS == 1
@@ -574,7 +574,7 @@ namespace wgms3d {
 	 */
 
 	complex<double> Tay[(2*NDIRS) * (2*(NDO+1))];
-	std::memset(Tay, 0, sizeof(Tay));
+	std::fill_n(Tay, sizeof(Tay)/sizeof(Tay[0]), complex<double>(0.0, 0.0));
 
 	for(k = 0; k < NDIRS; k++) {
 	    if(debugmgp) {
@@ -600,7 +600,7 @@ namespace wgms3d {
 	COPY(nrows, Tay + (NDO+2)*(2*NDIRS), inc, TayA + NDO*(2*NDIRS), inc);
 
 	complex<double> C[(2*NDIRS) * ((2*NDIRS)+2)];
-	std::memset(C, 0, sizeof(C));
+	std::fill_n(C, sizeof(C)/sizeof(C[0]), complex<double>(0.0, 0.0));
 	scale = -1.0;
 	nrows = (2*NDIRS);
 	inc = 1;
@@ -648,7 +648,7 @@ namespace wgms3d {
 	*/
 
 	M0 = new complex<double>[(2*NDO) * (2*NSP)];
-	std::memset(M0, 0, (2*NDO) * (2*NSP) * sizeof(*M0));
+	std::fill_n(M0, (2*NDO) * (2*NSP), complex<double>(0.0, 0.0));
 
 	nrows = 2*NDO;
 	inc = 1;

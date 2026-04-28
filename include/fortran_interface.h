@@ -21,9 +21,15 @@
 #ifndef _FORTRAN_INTERFACE_H
 #define _FORTRAN_INTERFACE_H
 
-#include "config.h"
-
 #include "complex_functions.h"
+
+#ifndef F77_FUNC
+#define F77_FUNC(name,NAME) name ## _
+#endif
+
+#ifndef F77_FUNC_
+#define F77_FUNC_(name,NAME) name ## _
+#endif
 
 extern "C"
 {
@@ -38,13 +44,13 @@ extern "C"
 				       int *incx, double *y, int *incy);
     extern void F77_FUNC(zaxpy,ZAXPY) (int *n, std::complex<double> *alpha, std::complex<double> *x,
 				       int *incx, std::complex<double> *y, int *incy);
-    extern void F77_FUNC(dgemm,DGEMM) (char *TRANSA, char *TRANSB, int *M, int *N, int *K,
-				       double *ALPHA, double *A, int *LDA, double *B, int *LDB,
-				       double *BETA, double *C, int *LDC);
-    extern void F77_FUNC(zgemm,ZGEMM) (char *TRANSA, char *TRANSB, int *M, int *N, int *K,
-				       std::complex<double> *ALPHA, std::complex<double> *A, int *LDA,
-				       std::complex<double> *B, int *LDB,
-				       std::complex<double> *BETA, std::complex<double> *C, int *LDC);
+    extern void F77_FUNC(dgemm,DGEMM) (const char *TRANSA, const char *TRANSB, const int *M, const int *N, const int *K,
+				       const double *ALPHA, const double *A, const int *LDA, const double *B, const int *LDB,
+				       const double *BETA, double *C, const int *LDC);
+    extern void F77_FUNC(zgemm,ZGEMM) (const char *TRANSA, const char *TRANSB, const int *M, const int *N, const int *K,
+				       const std::complex<double> *ALPHA, const std::complex<double> *A, const int *LDA,
+				       const std::complex<double> *B, const int *LDB,
+				       const std::complex<double> *BETA, std::complex<double> *C, const int *LDC);
 }
 
 inline void COPY (int n, double *x, int incx, double *y, int incy) {
@@ -64,14 +70,14 @@ inline void AXPY (int n, double alpha, double *x,
 inline void AXPY (int n, std::complex<double> alpha, std::complex<double> *x,
 		  int incx, std::complex<double> *y, int incy) {
     F77_FUNC(zaxpy,ZAXPY) (&n, &alpha, x, &incx, y, &incy); }
-inline void GEMM (char *TRANSA, char *TRANSB, int *M, int *N, int *K,
-		  double *ALPHA, double *A, int *LDA, double *B, int *LDB,
-		  double *BETA, double *C, int *LDC) {
+inline void GEMM (const char *TRANSA, const char *TRANSB, const int *M, const int *N, const int *K,
+		  const double *ALPHA, const double *A, const int *LDA, const double *B, const int *LDB,
+		  const double *BETA, double *C, const int *LDC) {
     F77_FUNC(dgemm,DGEMM) (TRANSA, TRANSB, M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC); }
-inline void GEMM (char *TRANSA, char *TRANSB, int *M, int *N, int *K,
-		  std::complex<double> *ALPHA, std::complex<double> *A, int *LDA,
-		  std::complex<double> *B, int *LDB,
-		  std::complex<double> *BETA, std::complex<double> *C, int *LDC) {
+inline void GEMM (const char *TRANSA, const char *TRANSB, const int *M, const int *N, const int *K,
+		  const std::complex<double> *ALPHA, const std::complex<double> *A, const int *LDA,
+		  const std::complex<double> *B, const int *LDB,
+		  const std::complex<double> *BETA, std::complex<double> *C, const int *LDC) {
     F77_FUNC(zgemm,ZGEMM) (TRANSA, TRANSB, M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC); }
 
 template <class T>
