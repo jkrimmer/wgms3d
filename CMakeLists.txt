@@ -291,7 +291,7 @@ if(WGMS3D_WITH_PETSC_SLEPC)
           ${_petsc_blaslapack_args}
       BUILD_COMMAND ${_petsc_clean_env} ${CMAKE_MAKE_PROGRAM}
       INSTALL_COMMAND ${_petsc_clean_env} ${CMAKE_MAKE_PROGRAM} install
-      BUILD_BYPRODUCTS ${PETSC_INSTALL_DIR}/lib/libpetsc.so
+      BUILD_BYPRODUCTS ${PETSC_INSTALL_DIR}/lib/libpetsc${CMAKE_SHARED_LIBRARY_SUFFIX}
     )
 
     ExternalProject_Add(slepc_ep
@@ -316,12 +316,12 @@ if(WGMS3D_WITH_PETSC_SLEPC)
         PETSC_DIR=${PETSC_INSTALL_DIR}
         PETSC_ARCH=
         ${CMAKE_MAKE_PROGRAM} install
-      BUILD_BYPRODUCTS ${SLEPC_INSTALL_DIR}/lib/libslepc.so
+      BUILD_BYPRODUCTS ${SLEPC_INSTALL_DIR}/lib/libslepc${CMAKE_SHARED_LIBRARY_SUFFIX}
     )
 
     add_library(petsc_vendor SHARED IMPORTED GLOBAL)
     set_target_properties(petsc_vendor PROPERTIES
-      IMPORTED_LOCATION ${PETSC_INSTALL_DIR}/lib/libpetsc.so
+      IMPORTED_LOCATION ${PETSC_INSTALL_DIR}/lib/libpetsc${CMAKE_SHARED_LIBRARY_SUFFIX}
       INTERFACE_INCLUDE_DIRECTORIES ${PETSC_INSTALL_DIR}/include
     )
     add_dependencies(petsc_vendor petsc_ep)
@@ -329,7 +329,7 @@ if(WGMS3D_WITH_PETSC_SLEPC)
     if(NOT WGMS3D_USE_SYSTEM_MPI)
       add_library(petsc_vendor_mpi SHARED IMPORTED GLOBAL)
       set_target_properties(petsc_vendor_mpi PROPERTIES
-        IMPORTED_LOCATION ${PETSC_INSTALL_DIR}/lib/libmpi.so
+        IMPORTED_LOCATION ${PETSC_INSTALL_DIR}/lib/libmpi${CMAKE_SHARED_LIBRARY_SUFFIX}
       )
       add_dependencies(petsc_vendor_mpi petsc_ep)
       set_property(TARGET petsc_vendor APPEND PROPERTY
@@ -339,7 +339,7 @@ if(WGMS3D_WITH_PETSC_SLEPC)
 
     add_library(slepc_vendor SHARED IMPORTED GLOBAL)
     set_target_properties(slepc_vendor PROPERTIES
-      IMPORTED_LOCATION ${SLEPC_INSTALL_DIR}/lib/libslepc.so
+      IMPORTED_LOCATION ${SLEPC_INSTALL_DIR}/lib/libslepc${CMAKE_SHARED_LIBRARY_SUFFIX}
       INTERFACE_INCLUDE_DIRECTORIES ${SLEPC_INSTALL_DIR}/include
     )
     add_dependencies(slepc_vendor slepc_ep)
