@@ -28,8 +28,8 @@ option(WGMS3D_VENDOR_BLAS_LAPACK "Fetch/build OpenBLAS as BLAS/LAPACK provider" 
 option(WGMS3D_VENDOR_PETSC_SLEPC "Fetch/build PETSc/SLEPc in the build tree" OFF)
 option(WGMS3D_VENDOR_PETSC_COMPLEX "When vendoring PETSc/SLEPc, build PETSc with complex scalars" ON)
 
-set(WGMS3D_PETSC_VERSION "3.21.2" CACHE STRING "PETSc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
-set(WGMS3D_SLEPC_VERSION "3.21.2" CACHE STRING "SLEPc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
+set(WGMS3D_PETSC_VERSION "3.25.0" CACHE STRING "PETSc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
+set(WGMS3D_SLEPC_VERSION "3.25.0" CACHE STRING "SLEPc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
 set(WGMS3D_PETSC_COPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C builds")
 set(WGMS3D_PETSC_CXXOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C++ builds")
 set(WGMS3D_PETSC_FOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc Fortran builds")
