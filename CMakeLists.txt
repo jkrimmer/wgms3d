@@ -34,8 +34,6 @@ set(WGMS3D_PETSC_COPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored P
 set(WGMS3D_PETSC_CXXOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C++ builds")
 set(WGMS3D_PETSC_FOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc Fortran builds")
 
-option(WGMS3D_EXPERIMENTAL_VENDOR_MPI "Experimental: build MPI in-tree" OFF)
-
 if(WGMS3D_WITH_SUPERLU_ARPACK AND WGMS3D_WITH_PETSC_SLEPC)
   message(FATAL_ERROR "SuperLU/ARPACK and PETSc/SLEPc are mutually exclusive.")
 endif()
@@ -46,10 +44,6 @@ endif()
 
 if(WGMS3D_WITH_PETSC_SLEPC AND NOT WGMS3D_WITH_MPI AND NOT WGMS3D_VENDOR_PETSC_SLEPC)
   message(FATAL_ERROR "PETSc/SLEPc backend without vendoring requires WGMS3D_WITH_MPI=ON.")
-endif()
-
-if(WGMS3D_EXPERIMENTAL_VENDOR_MPI)
-  message(FATAL_ERROR "Experimental in-tree MPI build is not implemented yet. Use a system MPI and WGMS3D_WITH_MPI=ON.")
 endif()
 
 if((WGMS3D_WITH_PETSC_SLEPC AND WGMS3D_VENDOR_PETSC_SLEPC) OR BUILD_TESTING)
