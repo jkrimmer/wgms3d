@@ -275,7 +275,7 @@ if(WGMS3D_WITH_PETSC_SLEPC)
           CC=${_petsc_cc}
           CXX=${_petsc_cxx}
           FC=${_petsc_fc}
-          CFLAGS=${_petsc_cflags}
+          CFLAGS+=${_petsc_cflags}
           COPTFLAGS=${WGMS3D_PETSC_COPTFLAGS}
           CXXOPTFLAGS=${WGMS3D_PETSC_CXXOPTFLAGS}
           FOPTFLAGS=${WGMS3D_PETSC_FOPTFLAGS}
