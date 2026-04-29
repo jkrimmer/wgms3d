@@ -24,6 +24,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Cache vendored PETSc and SLEPc
+        if: matrix.backend == 'petsc_slepc'
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/_deps/petsc
+            build/_deps/slepc
+          key: ${{ runner.os }}-${{ matrix.backend }}-cmake-deps-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.backend }}-cmake-deps-
+
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |

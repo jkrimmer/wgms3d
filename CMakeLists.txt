@@ -10,6 +10,14 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(WGMS3D_BOOST_VERSION "1.91.0" CACHE STRING "Boost version to vendor when WGMS3D_VENDOR_BOOST=ON")
+set(WGMS3D_OPENBLAS_VERSION "0.3.33" CACHE STRING "OpenBLAS version to vendor when WGMS3D_VENDOR_BLAS_LAPACK=ON")
+set(WGMS3D_SUPERLU_VERSION "7.0.1" CACHE STRING "SuperLU version to vendor when WGMS3D_VENDOR_SUPERLU=ON")
+set(WGMS3D_ARPACK_VERSION "3.9.1" CACHE STRING "ARPACK-NG version to vendor when WGMS3D_VENDOR_ARPACK=ON")
+set(WGMS3D_PETSC_VERSION "3.25.0" CACHE STRING "PETSc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
+set(WGMS3D_SLEPC_VERSION "3.25.0" CACHE STRING "SLEPc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
+string(REPLACE "." "_" WGMS3D_BOOST_VERSION_UNDERSCORE "${WGMS3D_BOOST_VERSION}")
+
 option(WGMS3D_WITH_SUPERLU_ARPACK "Build SuperLU/ARPACK solver backend" ON)
 option(WGMS3D_WITH_PETSC_SLEPC "Build PETSc/SLEPc solver backend" OFF)
 option(WGMS3D_WITH_MPI "Build with MPI support" ${WGMS3D_WITH_PETSC_SLEPC})
@@ -27,9 +35,6 @@ option(WGMS3D_VENDOR_ARPACK "Fetch/build ARPACK in the build tree" ON)
 option(WGMS3D_VENDOR_BLAS_LAPACK "Fetch/build OpenBLAS as BLAS/LAPACK provider" OFF)
 option(WGMS3D_VENDOR_PETSC_SLEPC "Fetch/build PETSc/SLEPc in the build tree" OFF)
 option(WGMS3D_VENDOR_PETSC_COMPLEX "When vendoring PETSc/SLEPc, build PETSc with complex scalars" ON)
-
-set(WGMS3D_PETSC_VERSION "3.25.0" CACHE STRING "PETSc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
-set(WGMS3D_SLEPC_VERSION "3.25.0" CACHE STRING "SLEPc version to vendor when WGMS3D_VENDOR_PETSC_SLEPC=ON")
 set(WGMS3D_PETSC_COPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C builds")
 set(WGMS3D_PETSC_CXXOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C++ builds")
 set(WGMS3D_PETSC_FOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc Fortran builds")
@@ -69,7 +74,7 @@ endif()
 if(WGMS3D_VENDOR_BOOST)
   FetchContent_Declare(
     boost_headers
-    URL https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz
+    URL https://archives.boost.io/release/${WGMS3D_BOOST_VERSION}/source/boost_${WGMS3D_BOOST_VERSION_UNDERSCORE}.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   )
   FetchContent_MakeAvailable(boost_headers)
@@ -85,7 +90,7 @@ endif()
 if(WGMS3D_VENDOR_BLAS_LAPACK)
   FetchContent_Declare(
     openblas
-    URL https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v0.3.30.tar.gz
+    URL https://github.com/OpenMathLib/OpenBLAS/archive/refs/tags/v${WGMS3D_OPENBLAS_VERSION}.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   )
   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -148,7 +153,7 @@ if(WGMS3D_WITH_SUPERLU_ARPACK)
     file(MAKE_DIRECTORY ${SUPERLU_INSTALL_DIR}/include)
     file(MAKE_DIRECTORY ${SUPERLU_INSTALL_DIR}/lib)
     ExternalProject_Add(superlu_ep
-      URL https://github.com/xiaoyeli/superlu/archive/refs/tags/v7.0.1.tar.gz
+      URL https://github.com/xiaoyeli/superlu/archive/refs/tags/v${WGMS3D_SUPERLU_VERSION}.tar.gz
       PREFIX ${CMAKE_BINARY_DIR}/_deps/superlu_ep
       INSTALL_DIR ${SUPERLU_INSTALL_DIR}
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
@@ -181,7 +186,7 @@ if(WGMS3D_WITH_SUPERLU_ARPACK)
     set(ARPACK_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps/arpack)
     file(MAKE_DIRECTORY ${ARPACK_INSTALL_DIR}/lib)
     ExternalProject_Add(arpack_ep
-      URL https://github.com/opencollab/arpack-ng/archive/refs/tags/3.9.1.tar.gz
+      URL https://github.com/opencollab/arpack-ng/archive/refs/tags/${WGMS3D_ARPACK_VERSION}.tar.gz
       PREFIX ${CMAKE_BINARY_DIR}/_deps/arpack_ep
       INSTALL_DIR ${ARPACK_INSTALL_DIR}
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
