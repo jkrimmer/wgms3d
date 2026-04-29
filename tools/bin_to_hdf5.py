@@ -38,6 +38,7 @@ z   - 1-D complex128 array read from z.txt
 
 import argparse
 import re
+import os
 import sys
 from pathlib import Path
 
@@ -49,14 +50,14 @@ import h5py
 # Binary reader (mirrors wgms3d_read_bin_data.m)
 # ---------------------------------------------------------------------------
 
-def read_bin_field(path: Path, r: np.ndarray, z: np.ndarray):
+def read_bin_field(path: Path, r: np.ndarray, z: np.ndarray) -> tuple[complex, np.ndarray]:
     """
     Read a wgms3d binary field file and return (n_eff, field).
 
     File layout
     -----------
-    [0]   n_eff_real  - float64  ┐ complex effective index
-    [1]   n_eff_imag  - float64  ┘
+    [0]   beta_real  - float64  ┐ complex propagation constant
+    [1]   beta_imag  - float64  ┘
     [2:]  field data  - 2*len_r*len_z float64 values in Fortran order:
           interleaved real/imag pairs along the r axis, column-major over z.
 
@@ -71,7 +72,7 @@ def read_bin_field(path: Path, r: np.ndarray, z: np.ndarray):
 
     Returns
     -------
-    n_eff  : complex  - effective index from the file header.
+    beta   : complex  - propagation constant from the file header.
     field  : np.ndarray, dtype=complex128, shape=(len_z, len_r)
     """
     len_r = len(r)
@@ -88,7 +89,7 @@ def read_bin_field(path: Path, r: np.ndarray, z: np.ndarray):
             f"({HEADER} header + 2*{len_r}*{len_z} field), got {raw.size}."
         )
 
-    n_eff = complex(raw[0], raw[1])
+    beta = complex(raw[0], raw[1])
     body  = raw[HEADER:]
 
     # Reshape to (2*len_r, len_z) in Fortran (column-major) order,
@@ -99,8 +100,9 @@ def read_bin_field(path: Path, r: np.ndarray, z: np.ndarray):
     imag_part = data[1::2, :]   # rows 1,3,5,... (0-based) → imaginary
 
     # Transpose: MATLAB's  data(real,:)'  gives shape (len_z, len_r)
-    field = real_part.T + 1j * imag_part.T
-    return n_eff, field
+    # field = real_part.T + 1j * imag_part.T
+    field = real_part + 1j * imag_part
+    return beta, field
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +272,7 @@ def load_coord(path: Path, name: str) -> np.ndarray:
 # Main conversion routine
 # ---------------------------------------------------------------------------
 
-def convert(directory: Path, output_path: Path) -> None:
+def convert(directory: Path, output_path: Path, delete_inputs: bool = False) -> None:
     # ── 1. Validate directory ────────────────────────────────────────────
     if not directory.exists():
         print(f"Error: directory '{directory}' does not exist.", file=sys.stderr)
@@ -344,22 +346,37 @@ def convert(directory: Path, output_path: Path) -> None:
                 print(f"\nError reading mode {idx}: {exc}", file=sys.stderr)
                 sys.exit(1)
 
-            # Store complex field data; attach n_eff as a per-dataset attribute.
+            # Store complex field data; attach beta as a per-dataset attribute.
             # (HDF5 has no native complex type; h5py uses a compound dtype
             #  that most readers handle transparently as complex128.)
-            for component, (n_eff, data) in component_data.items():
+            for component, (beta, data) in component_data.items():
                 ds = hdf5_groups[component].create_dataset(mode_label, data=data)
-                ds.attrs["n_eff"] = [n_eff.real, n_eff.imag]
+                ds.attrs["beta"] = [beta.real, beta.imag]
 
             # Prefer hr for vector status line, otherwise fall back to scalar.
             status_component = "hr" if "hr" in component_data else "sc"
-            status_neff, status_data = component_data[status_component]
+            status_beta, status_data = component_data[status_component]
             print(
                 f" shape={status_data.shape}, "
-                f"n_eff={status_neff.real:.10f}{status_neff.imag:+.3e}j"
+                f" beta={status_beta.real:.10f}{status_beta.imag:+.3e}j"
             )
 
     print(f"\nDone. Output: {output_path.resolve()}")
+
+    if delete_inputs:
+        print("Deleting input files …")
+        for files in component_files.values():
+            for path in files.values():
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    print(f"Warning: could not delete {path}: {exc}", file=sys.stderr)
+        for coord_path in [r_path, z_path]:
+            try:
+                coord_path.unlink()
+            except OSError as exc:
+                print(f"Warning: could not delete {coord_path}: {exc}", file=sys.stderr)
+        print("Input files deleted.")
 
 
 # ---------------------------------------------------------------------------
@@ -375,18 +392,24 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "directory",
+        "--directory", "-d",
         type=Path,
+        default=os.getcwd(),
         help="Path to the folder containing the .bin, r.txt and z.txt files.",
     )
     parser.add_argument(
         "--output", "-o",
         type=Path,
-        default=None,
+        default=Path(os.getcwd(), "modes.h5"),
         help=(
             "Path for the output HDF5 file. "
             "Defaults to <directory>/modes.h5"
         ),
+    )
+    parser.add_argument(
+        "--delete-inputs",
+        action="store_true",
+        help="Delete the input .bin and .txt files after conversion.",
     )
     return parser.parse_args()
 
@@ -399,7 +422,7 @@ def main() -> None:
         if args.output is not None
         else directory / "modes.h5"
     )
-    convert(directory, output_path)
+    convert(directory, output_path, args.delete_inputs)
 
 
 if __name__ == "__main__":
