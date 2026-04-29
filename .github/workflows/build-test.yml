@@ -1,0 +1,65 @@
+name: Build Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-test-unix:
+    name: Build Test (${{ matrix.os }}, ${{ matrix.backend }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        backend:
+          - superlu_arpack
+          - petsc_slepc
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            gfortran \
+            cmake \
+            libblas-dev \
+            liblapack-dev
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake
+          GCC_VER=$(brew list --versions gcc | awk '{print $2}' | cut -d. -f1)
+          echo "CC=gcc-${GCC_VER}"       >> "$GITHUB_ENV"
+          echo "CXX=g++-${GCC_VER}"     >> "$GITHUB_ENV"
+          echo "FC=gfortran-${GCC_VER}" >> "$GITHUB_ENV"
+
+      - name: Configure CMake (superlu_arpack)
+        if: matrix.backend == 'superlu_arpack'
+        run: |
+          cmake -B build \
+            -DWGMS3D_WITH_SUPERLU_ARPACK=ON \
+            -DWGMS3D_WITH_PETSC_SLEPC=OFF
+
+      - name: Configure CMake (petsc_slepc)
+        if: matrix.backend == 'petsc_slepc'
+        run: |
+          cmake -B build \
+            -DWGMS3D_WITH_PETSC_SLEPC=ON \
+            -DWGMS3D_VENDOR_PETSC_SLEPC=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
