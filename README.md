@@ -64,6 +64,8 @@ cmake --install build
 - `WGMS3D_VENDOR_BLAS_LAPACK=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_SLEPC=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_COMPLEX=ON|OFF` (default: `ON`)
+- `WGMS3D_WITH_CUDA=ON|OFF` (default: `OFF`) — enable CUDA backend (PETSc/SLEPc only)
+- `WGMS3D_CUDA_ARCH=<sm_XX>` — pin CUDA architecture for vendored PETSc build (e.g. `sm_80`)
 
 Current backend behavior:
 - We build with SuperLU/ARPACK by default.
@@ -96,6 +98,106 @@ Vendored PETSc optimization flags, i.e.
 - `WGMS3D_PETSC_CXXOPTFLAGS`
 - `WGMS3D_PETSC_FOPTFLAGS`
 are set to `-O3` by default.
+
+
+### CUDA acceleration (PETSc/SLEPc backend only)
+
+wgms3d can offload the sparse eigensolver to an NVIDIA GPU via PETSc's CUDA
+backend.  Two operations might benefit:
+
+| Operation | GPU path |
+|-----------|----------|
+| Sparse matrix–vector products (outer Krylov loop) | cuSPARSE (`MATAIJCUSPARSE`) |
+| Shift-and-invert LU factorization + triangular solves | cuSPARSE direct solver (`MATSOLVERCUSPARSE`, single-process only) |
+
+Keeping both operations on the GPU is critical for performance.  If only the
+SpMV runs on GPU while the LU solve remains on CPU (as with MUMPS), the
+frequent host-device transfers dominate and erase any benefit.
+
+GPU acceleration is **opt-in at runtime** via the `--cuda` flag.  The same
+binary runs on CPU by default and switches to GPU when `--cuda` is passed.
+
+**`MATSOLVERCUSPARSE` vs. MUMPS**: PETSc's `MATSOLVERCUSPARSE` is automatically
+used for the LU factorization and triangular solves when running with `--cuda`
+on a single MPI process (the typical use case), keeping the entire solve on
+the GPU — no extra flags required.
+For multi-process MPI runs `MATSOLVERCUSPARSE` is sequential-only, so MUMPS
+is used as a fallback (LU on CPU, SpMV on GPU).
+
+A CUDA toolkit installation is required.
+
+**Vendored PETSc/SLEPc with CUDA (recommended):**
+```bash
+cmake -B build \
+    -DWGMS3D_WITH_PETSC_SLEPC=ON \
+    -DWGMS3D_VENDOR_PETSC_SLEPC=ON \
+    -DWGMS3D_WITH_CUDA=ON
+cmake --build build -j
+```
+
+To target a specific GPU architecture and avoid the auto-detection overhead,
+pass `WGMS3D_CUDA_ARCH` (use the `sm_XX` identifier matching your GPU, e.g.
+`sm_80` for Ampere, `sm_89` for Ada Lovelace):
+```bash
+cmake -B build \
+    -DWGMS3D_WITH_PETSC_SLEPC=ON \
+    -DWGMS3D_VENDOR_PETSC_SLEPC=ON \
+    -DWGMS3D_WITH_CUDA=ON \
+    -DWGMS3D_CUDA_ARCH=sm_80
+cmake --build build -j
+```
+
+**System PETSc/SLEPc built with CUDA:**
+
+If your system PETSc was already compiled with CUDA support, pass
+`-DWGMS3D_WITH_CUDA=ON` so that wgms3d enables the `--cuda` runtime flag:
+```bash
+PETSC_DIR=/path/to/petsc SLEPC_DIR=/path/to/slepc \
+cmake -B build \
+    -DWGMS3D_WITH_PETSC_SLEPC=ON \
+    -DWGMS3D_WITH_CUDA=ON
+cmake --build build -j
+```
+
+**Using the GPU at runtime:**
+
+```bash
+# CPU solve (default):
+./build/wgms3d -l 1.55 -g geometry.mgp -U ... -V ... -n 4
+
+# GPU solve:
+./build/wgms3d --cuda -l 1.55 -g geometry.mgp -U ... -V ... -n 4
+```
+
+Passing `--cuda` to a build not compiled with `-DWGMS3D_WITH_CUDA=ON` prints
+an error and exits.
+
+**Verifying CUDA is active:**
+
+wgms3d prints the solver in use:
+```
+Solver used for factorization: : cusparse.
+```
+
+**Runtime tuning:**
+
+Most solver settings are exposed to the command line via `EPSSetFromOptions`
+(which cascades through ST → KSP → PC). Useful flags:
+
+```bash
+# Profile where time is spent:
+./build/wgms3d --cuda -log_view [other options...]
+
+# Increase Krylov subspace size (more memory, fewer restarts, sometimes faster):
+./build/wgms3d --cuda -eps_ncv 60 [other options...]
+
+# Increase tolerance (lower precision, sometimes faster):
+./build/wgms3d --cuda -eps_tol 1e-8 [other options...]
+```
+
+Note: 
+- `-st_pc_factor_mat_solver_type` can be used to manuelly set the solver, e.g., to use MUMPS (CPU) for the LU-factorization with GPU-based eigensolving.
+- `-st_ksp_type gmres -st_pc_type jacobi` enables using iterative factorization
 
 
 ## Authors and Credits

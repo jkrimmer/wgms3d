@@ -127,13 +127,16 @@ namespace {
 	    std::unique_ptr< sparse_matrix<std::complex<double>> > matrix,
 	    bool is_matrix_real,
 	    double sigma,
-	    int num_eigenvalues
+	    int num_eigenvalues,
+	    bool use_cuda
 	    )
 	    : n(matrix->n),
 	      mat(nullptr), eps(nullptr), xr(nullptr), xi(nullptr), local_vector(nullptr)
 	{
 	    SlepcInitialize(NULL,NULL,(char *)0,NULL);
 		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	    int mpi_size = 1;
+	    MPI_Comm_size(PETSC_COMM_WORLD, &mpi_size);
 
 	    if(rank == 0 && is_matrix_real && std::is_same< PetscScalar, std::complex<double> >::value)
 	    {
@@ -145,7 +148,18 @@ namespace {
 
 	    ierr = MatCreate(PETSC_COMM_WORLD, &mat); CHKERRXX(ierr);
 	    ierr = MatSetSizes(mat, PETSC_DECIDE, PETSC_DECIDE, n, n); CHKERRXX(ierr);
+#ifdef WGMS3D_WITH_CUDA
+	    if(use_cuda) {
+			// Use MATAIJCUSPARSE so PETSc offloads sparse matrix-vector
+			// products to the GPU during Krylov iterations.
+			ierr = MatSetType(mat, MATAIJCUSPARSE); CHKERRXX(ierr);
+	    } else {
+			ierr = MatSetType(mat, MATAIJ); CHKERRXX(ierr);
+	    }
+#else
 	    ierr = MatSetType(mat, MATAIJ); CHKERRXX(ierr);
+#endif
+	    ierr = MatSetFromOptions(mat); CHKERRXX(ierr);
 	    ierr = MatSetUp(mat); CHKERRXX(ierr);
 
 	    ierr = MatSeqAIJSetPreallocation(mat, 18, nullptr); CHKERRXX(ierr);
@@ -153,20 +167,20 @@ namespace {
 
 	    PetscPrintf(PETSC_COMM_WORLD, "Converting matrix to PETSc format...\n");
 
-	    // TODO: parallelize (for example, make sparse_matrix a
-	    // wrapper for PETSc matrix).
-	    if(rank == 0)
-	    {
-		// TODO: speed this up.
-		matrix->order(1);
-		for(unsigned int i = 0; i < matrix->length; i++)
-		{
-		    PetscInt x = matrix->entries[i].i;
-		    PetscInt y = matrix->entries[i].j;
-		    PetscScalar value = wgms3d::maybeConvertComplexToReal(matrix->entries[i].v, PetscScalar());
-		    ierr = MatSetValues(mat, 1, &x, 1, &y, &value, INSERT_VALUES); CHKERRXX(ierr);
+	    // parallelize matrix insertion (Sonnet 4.6)
+		PetscInt row_start, row_end;
+		MatGetOwnershipRange(mat, &row_start, &row_end);
+
+		for (unsigned int i = 0; i < matrix->length; i++) {
+			PetscInt x = matrix->entries[i].i;
+			if (x >= row_start && x < row_end) {  // only insert locally owned rows
+				PetscInt y = matrix->entries[i].j;
+				PetscScalar value = wgms3d::maybeConvertComplexToReal(
+					matrix->entries[i].v, PetscScalar());
+				ierr = MatSetValues(mat, 1, &x, 1, &y, &value, INSERT_VALUES);
+				CHKERRXX(ierr);
+			}
 		}
-	    }
 	    matrix.reset();
 
 	    ierr = MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY); CHKERRXX(ierr);
@@ -191,9 +205,19 @@ namespace {
 	    PC pc;
 	    ierr = KSPGetPC(ksp, &pc); CHKERRXX(ierr);
 	    ierr = PCSetType(pc, PCLU); CHKERRXX(ierr);
-	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
+#ifdef WGMS3D_WITH_CUDA
+		// Define the sparse direct solver to use for the LU factorization.
+	    if(use_cuda) {
+			ierr = PCFactorSetMatSolverType(pc, MATSOLVERCUSPARSE); CHKERRXX(ierr);
+		}
+		else {
+			ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
+		}
+#else
+		ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
 //	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST); CHKERRXX(ierr);
 //	    ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU); CHKERRXX(ierr);
+#endif
 
 	    // note: the default tolerance is 1e-8 instead of 1e-16. this has
 	    // led to incorrect mode fields for the degenerate fundamental
@@ -201,6 +225,24 @@ namespace {
 	    // -0.8:100:+0.8 -V -0.8:100:+0.8 -n 4, where fiber.mgp is from
 	    // the tutorial.
 	    ierr = EPSSetTolerances(eps, 1e-16, PETSC_DECIDE); CHKERRXX(ierr);
+
+	    // Allow all solver settings to be overridden from the command line
+	    // (e.g. -eps_ncv, -log_view, ...).
+	    ierr = EPSSetFromOptions(eps); CHKERRXX(ierr);
+
+		// Print out the solver in use, which is useful for debugging and performance comparisons.
+		MatSolverType solver_in_use;
+		PetscErrorCode qerr = PCFactorGetMatSolverType(pc, &solver_in_use);
+		if(qerr == 0 && solver_in_use) {
+			PetscPrintf(PETSC_COMM_WORLD, "Solver used for factorization: %s.\n", solver_in_use);
+		}
+		else {
+			PetscPrintf(PETSC_COMM_WORLD, "Couldn't determine solver in use.\n");
+		}
+		// Verify that the active tolerance setting is not too high, which can lead to incorrect mode fields for degenerate modes.
+		PetscReal active_tol;
+		ierr = EPSGetTolerances(eps, &active_tol, NULL); CHKERRXX(ierr);
+	    PetscPrintf(PETSC_COMM_WORLD, "Requiring tolerance=%.2e...\n", active_tol);
 
 	    PetscPrintf(PETSC_COMM_WORLD, "Eigensolving using SLEPc (nev=%d)...\n", num_eigenvalues);
 	    ierr = EPSSolve(eps); CHKERRXX(ierr);
@@ -289,7 +331,8 @@ std::unique_ptr<ISolverResult> eigenSolver (
     std::unique_ptr< sparse_matrix<std::complex<double>> > matrix,
     bool is_matrix_real,
     double sigma,
-    int num_eigenvalues
+    int num_eigenvalues,
+    bool use_cuda
     )
 {
     if(!is_matrix_real && std::is_same<PetscScalar, double>::value)
@@ -300,5 +343,5 @@ std::unique_ptr<ISolverResult> eigenSolver (
 	   "needed for this."));
     }
     
-    return make_unique<SlepcSolverResult>(std::move(matrix), is_matrix_real, sigma, num_eigenvalues);
+    return make_unique<SlepcSolverResult>(std::move(matrix), is_matrix_real, sigma, num_eigenvalues, use_cuda);
 }

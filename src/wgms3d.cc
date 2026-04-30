@@ -262,6 +262,11 @@ namespace wgms3d {
 	sp->use_five_point_standard = to;
     }
 
+    void ModeSolver::set_use_cuda (bool use_cuda)
+    {
+	use_cuda_ = use_cuda;
+    }
+
     void
     ModeSolver::set_geometry (const char *mgp_filename)
     {
@@ -798,7 +803,7 @@ namespace wgms3d {
 
 	//std::cout << "A->n = " << A->n << ", A->length = " << A->length << ", sigma = " << shift_invert_sigma << std::endl;
 	const bool real_matrix = !sp->mgp->hasComplexIndices() && pml_specs.size() == 0;
-	solver_result = eigenSolver(std::move(A), real_matrix, shift_invert_sigma, number_of_modes);
+	solver_result = eigenSolver(std::move(A), real_matrix, shift_invert_sigma, number_of_modes, use_cuda_);
 
 	if(rank == 0) {
 	    // We initialize these matrices at this point (after

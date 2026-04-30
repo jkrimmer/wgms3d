@@ -20,8 +20,11 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <cstring>
+#include <vector>
 
 #include <unistd.h>
+#include <getopt.h>
 
 #include <boost/throw_exception.hpp>
 #include <boost/exception/diagnostic_information.hpp>
@@ -142,17 +145,69 @@ namespace
 	bool write_ez = false;
 	bool write_ep = false;
 	bool write_hp = false;
+	bool use_cuda = false;
 
 	static_assert(sizeof(int) == 4, "Code assumes that sizeof(int) == 4.");
 	static_assert(sizeof(std::complex<double>) == 16, "Code assumes that sizeof(std::complex<double>) == 16.");
 
 	auto wg = make_unique<wgms3d::ModeSolver>();
 
+// Split argv so that each parser only sees the options it owns.
+	// PETSc options are multi-char single-dash names containing '_'
+	// (e.g. -st_pc_factor_mat_solver_type, -eps_ncv); wgms3d uses only
+	// single-char short options and --cuda.
+	auto wgms3d_is_flag     = [](char c) { return std::strchr("heEFGH5duvp", c) != nullptr; };
+	auto wgms3d_takes_arg   = [](char c) { return std::strchr("lngcsRMUVP",  c) != nullptr; };
+
+	std::vector<char*> wg_argv_vec    = { argv[0] };
+	std::vector<char*> petsc_argv_vec = { argv[0] };
+
+	for (int i = 1; i < argc; ) {
+	    char* arg = argv[i];
+	    if (arg[0] == '-' && arg[1] == '-') {
+		// Long option: only --cuda belongs to wgms3d
+		if (std::strcmp(arg, "--cuda") == 0)
+		    wg_argv_vec.push_back(arg);
+		else
+		    petsc_argv_vec.push_back(arg);
+		i++;
+	    } else if (arg[0] == '-' && arg[1] != '\0' && arg[2] != '\0'
+		       && std::strchr(arg + 1, '_') != nullptr) {
+		// Multi-char single-dash containing '_': PETSc style
+		// e.g. -pc_factor_mat_solver_type, -eps_ncv
+		petsc_argv_vec.push_back(arg);
+		i++;
+		// If next token has no leading '-', it is the value for this option
+		if (i < argc && argv[i][0] != '-')
+		    petsc_argv_vec.push_back(argv[i++]);
+	    } else if (arg[0] == '-' && arg[1] != '\0') {
+		// Short option (single char, or combined flags like -de,
+		// or option with concatenated value like -U-13:400:13)
+		char opt = arg[1];
+		if (wgms3d_is_flag(opt) || wgms3d_takes_arg(opt)) {
+		    wg_argv_vec.push_back(arg);
+		    i++;
+		    // Consume separate value token for opts that take an argument
+		    if (wgms3d_takes_arg(opt) && arg[2] == '\0' && i < argc)
+			wg_argv_vec.push_back(argv[i++]);
+		} else {
+		    petsc_argv_vec.push_back(arg);
+		    i++;
+		}
+	    } else {
+		// Non-option positional arg (wgms3d has none; pass to PETSc)
+		petsc_argv_vec.push_back(arg);
+		i++;
+	    }
+	}
+
+	int   wg_argc      = static_cast<int>(wg_argv_vec.size());
+	char** wg_argv     = wg_argv_vec.data();
+
 #ifdef WGMS3D_WITH_SLEPC
-	// don't want collisions with our own arguments, so we disable
-	// this for the moment:
-	//SlepcInitialize(&argc, &argv, (char*)0, nullptr);
-	SlepcInitializeNoArguments();
+	int   petsc_argc   = static_cast<int>(petsc_argv_vec.size());
+	char** petsc_argv_ptr = petsc_argv_vec.data();
+	SlepcInitialize(&petsc_argc, &petsc_argv_ptr, (char*)0, nullptr);
 #endif
 
 	int rank = 0;
@@ -167,9 +222,29 @@ namespace
 
 	while (1) {
 	    int oo;
-	    oo = getopt(argc, argv, "l:n:g:c:s:R:hM:eEFGH5dU:V:P:uvp");
+	    static const struct option long_options[] = {
+		{ "cuda", no_argument, nullptr, 0 },
+		{ nullptr, 0, nullptr, 0 }
+	    };
+	    int long_index = -1;
+	    oo = getopt_long(wg_argc, wg_argv, "l:n:g:c:s:R:hM:eEFGH5dU:V:P:uvp",
+			  long_options, &long_index);
 	    if(oo == -1)
 		break;
+
+	    if(oo == 0) {
+		// long option
+		if(long_index == 0) { // --cuda
+#ifdef WGMS3D_WITH_CUDA
+		    use_cuda = true;
+#else
+		    std::cerr << "--cuda: this build was not compiled with CUDA support "
+				"(rebuild with -DWGMS3D_WITH_CUDA=ON)." << std::endl;
+		    exit(1);
+#endif
+		}
+		continue;
+	    }
 
 	    switch(oo) {
 	    case 'h':
@@ -313,6 +388,9 @@ namespace
 	    printf(" -G               Also export E^phi field\n");
 	    printf(" -H               Also export H^phi field\n");
 	    printf(" -5               Use 5-point formulas in hom. regions\n");
+#ifdef WGMS3D_WITH_CUDA
+	    printf(" --cuda           Use GPU acceleration (cuSPARSE/MATAIJCUSPARSE)\n");
+#endif
 	    printf("\n");
 	    printf(" Grid specification <desc> is either:\n");
 	    printf("    p1:n:p2       N grid points between P1 and P2\n");
@@ -328,6 +406,7 @@ namespace
 	wg->setGrid(std::vector<double>(r0, r0+nr), std::vector<double>(z0, z0+nz));
 	wg->set_curvature(curvature);
 	wg->set_wavelength(lambda);
+	wg->set_use_cuda(use_cuda);
 
 	// Some diagnostic output (only root process)
 	if(rank == 0) {

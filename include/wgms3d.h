@@ -247,6 +247,8 @@ namespace wgms3d
 
 	void set_five_point_standard (bool to);
 
+	void set_use_cuda (bool use_cuda);
+
 	const std::complex<double> * get_stretched_rhos();
 	const std::complex<double> * get_stretched_zs();
 
@@ -288,6 +290,8 @@ namespace wgms3d
 
 	/// shared_ptr, because this is passed on to class Mode.
 	std::shared_ptr< class DerivedFieldMatrices > deriv_field_mats;
+
+	bool use_cuda_ = false;
 
 	std::unique_ptr<sparse_matrix<std::complex<double>>> initmatrix (
 	    class Diffops & diffops,

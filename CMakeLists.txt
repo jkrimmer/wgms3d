@@ -35,6 +35,8 @@ option(WGMS3D_VENDOR_ARPACK "Fetch/build ARPACK in the build tree" ON)
 option(WGMS3D_VENDOR_BLAS_LAPACK "Fetch/build OpenBLAS as BLAS/LAPACK provider" OFF)
 option(WGMS3D_VENDOR_PETSC_SLEPC "Fetch/build PETSc/SLEPc in the build tree" OFF)
 option(WGMS3D_VENDOR_PETSC_COMPLEX "When vendoring PETSc/SLEPc, build PETSc with complex scalars" ON)
+option(WGMS3D_WITH_CUDA "Enable CUDA acceleration via PETSc/SLEPc CUDA backend (requires CUDA toolkit)" OFF)
+set(WGMS3D_CUDA_ARCH "" CACHE STRING "CUDA architecture for vendored PETSc CUDA build (e.g. sm_80); empty = auto-detect")
 set(WGMS3D_PETSC_COPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C builds")
 set(WGMS3D_PETSC_CXXOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C++ builds")
 set(WGMS3D_PETSC_FOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc Fortran builds")
@@ -270,6 +272,14 @@ if(WGMS3D_WITH_PETSC_SLEPC)
       set(_petsc_scalar_type complex)
     endif()
 
+    set(_petsc_cuda_args)
+    if(WGMS3D_WITH_CUDA)
+      list(APPEND _petsc_cuda_args --with-cuda=1)
+      if(WGMS3D_CUDA_ARCH)
+        list(APPEND _petsc_cuda_args --with-cuda-arch=${WGMS3D_CUDA_ARCH})
+      endif()
+    endif()
+
     ExternalProject_Add(petsc_ep
       URL https://github.com/petsc/petsc/archive/refs/tags/v${WGMS3D_PETSC_VERSION}.tar.gz
       PREFIX ${CMAKE_BINARY_DIR}/_deps/petsc_ep
@@ -294,6 +304,7 @@ if(WGMS3D_WITH_PETSC_SLEPC)
             ${_petsc_mpi_args}
             ${_petsc_mumps_args}
           ${_petsc_blaslapack_args}
+          ${_petsc_cuda_args}
       BUILD_COMMAND ${_petsc_clean_env} ${CMAKE_MAKE_PROGRAM}
       INSTALL_COMMAND ${_petsc_clean_env} ${CMAKE_MAKE_PROGRAM} install
       BUILD_BYPRODUCTS ${PETSC_INSTALL_DIR}/lib/libpetsc${CMAKE_SHARED_LIBRARY_SUFFIX}
@@ -400,6 +411,7 @@ target_compile_definitions(wgms3d PRIVATE
   $<$<BOOL:${WGMS3D_COMPILE_WITH_MPI}>:WGMS3D_WITH_MPI>
   $<$<BOOL:${WGMS3D_COMPILE_WITH_PETSC}>:WGMS3D_WITH_PETSC>
   $<$<BOOL:${WGMS3D_COMPILE_WITH_SLEPC}>:WGMS3D_WITH_SLEPC>
+  $<$<BOOL:${WGMS3D_WITH_CUDA}>:WGMS3D_WITH_CUDA>
 )
 target_compile_options(wgms3d PRIVATE -Wall -pedantic)
 if(CMAKE_Fortran_IMPLICIT_LINK_DIRECTORIES)

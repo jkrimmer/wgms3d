@@ -54,7 +54,8 @@ std::unique_ptr<ISolverResult> eigenSolver (
     std::unique_ptr< sparse_matrix<std::complex<double>> > matrix,
     bool is_matrix_real, //< set to true iff matrix contains real entries only
     double sigma,
-    int num_eigenvalues
+    int num_eigenvalues,
+    bool use_cuda = false //< request GPU-resident solve via MATSOLVERCUSPARSE
     );
 
 #endif // WGMS3D_SOLVER_H

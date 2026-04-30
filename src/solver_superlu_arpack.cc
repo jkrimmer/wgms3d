@@ -597,7 +597,8 @@ std::unique_ptr<ISolverResult> eigenSolver (
     std::unique_ptr< sparse_matrix<std::complex<double>> > matrix,
     bool is_matrix_real,
     double sigma,
-    int num_eigenvalues
+    int num_eigenvalues,
+	bool use_cuda // ignored, since ARPACK doesn't support GPU acceleration
     )
 {
     return make_unique<ArpackSolverResult>(std::move(matrix), is_matrix_real, sigma, num_eigenvalues);
