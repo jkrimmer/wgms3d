@@ -40,6 +40,8 @@ set(WGMS3D_CUDA_ARCH "" CACHE STRING "CUDA architecture for vendored PETSc CUDA 
 set(WGMS3D_PETSC_COPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C builds")
 set(WGMS3D_PETSC_CXXOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc C++ builds")
 set(WGMS3D_PETSC_FOPTFLAGS "-O3" CACHE STRING "Optimization flags for vendored PETSc Fortran builds")
+set(WGMS3D_PETSC_DIRECT_SOLVER "MUMPS" CACHE STRING "Direct sparse solver for vendored PETSc (MUMPS or SUPERLU_DIST)")
+set_property(CACHE WGMS3D_PETSC_DIRECT_SOLVER PROPERTY STRINGS MUMPS SUPERLU_DIST)
 
 if(WGMS3D_WITH_SUPERLU_ARPACK AND WGMS3D_WITH_PETSC_SLEPC)
   message(FATAL_ERROR "SuperLU/ARPACK and PETSc/SLEPc are mutually exclusive.")
@@ -51,6 +53,11 @@ endif()
 
 if(WGMS3D_WITH_PETSC_SLEPC AND NOT WGMS3D_WITH_MPI AND NOT WGMS3D_VENDOR_PETSC_SLEPC)
   message(FATAL_ERROR "PETSc/SLEPc backend without vendoring requires WGMS3D_WITH_MPI=ON.")
+endif()
+
+string(TOUPPER "${WGMS3D_PETSC_DIRECT_SOLVER}" WGMS3D_PETSC_DIRECT_SOLVER)
+if(NOT WGMS3D_PETSC_DIRECT_SOLVER STREQUAL "MUMPS" AND NOT WGMS3D_PETSC_DIRECT_SOLVER STREQUAL "SUPERLU_DIST")
+  message(FATAL_ERROR "Invalid WGMS3D_PETSC_DIRECT_SOLVER='${WGMS3D_PETSC_DIRECT_SOLVER}'. Valid values: MUMPS, SUPERLU_DIST.")
 endif()
 
 if((WGMS3D_WITH_PETSC_SLEPC AND WGMS3D_VENDOR_PETSC_SLEPC) OR BUILD_TESTING)
@@ -120,6 +127,7 @@ set(extra_link_libraries)
 set(WGMS3D_COMPILE_WITH_MPI OFF)
 set(WGMS3D_COMPILE_WITH_PETSC OFF)
 set(WGMS3D_COMPILE_WITH_SLEPC OFF)
+set(WGMS3D_COMPILE_WITH_PETSC_SUPERLU_DIST OFF)
 
 set(WGMS3D_USE_SYSTEM_MPI OFF)
 set(WGMS3D_VENDOR_PETSC_NEEDS_MPI OFF)
@@ -137,9 +145,9 @@ if(WGMS3D_WITH_MPI OR WGMS3D_VENDOR_PETSC_NEEDS_MPI)
         set(WGMS3D_COMPILE_WITH_MPI ON)
       endif()
     elseif(WGMS3D_WITH_MPI)
-      message(STATUS "System MPI not found. Vendored PETSc/SLEPc will download MPICH so PETSc can build with MUMPS.")
+      message(STATUS "System MPI not found. Vendored PETSc/SLEPc will download MPICH for PETSc (${WGMS3D_PETSC_DIRECT_SOLVER}).")
     else()
-      message(STATUS "Vendored PETSc/SLEPc will download MPICH so PETSc can build with MUMPS.")
+      message(STATUS "Vendored PETSc/SLEPc will download MPICH for PETSc (${WGMS3D_PETSC_DIRECT_SOLVER}).")
     endif()
   else()
     find_package(MPI REQUIRED COMPONENTS C CXX Fortran)
@@ -226,6 +234,9 @@ if(WGMS3D_WITH_SUPERLU_ARPACK)
 endif()
 
 if(WGMS3D_WITH_PETSC_SLEPC)
+  if(WGMS3D_PETSC_DIRECT_SOLVER STREQUAL "SUPERLU_DIST")
+    set(WGMS3D_COMPILE_WITH_PETSC_SUPERLU_DIST ON)
+  endif()
   if(WGMS3D_VENDOR_PETSC_SLEPC)
     set(PETSC_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps/petsc)
     set(SLEPC_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps/slepc)
@@ -244,15 +255,25 @@ if(WGMS3D_WITH_PETSC_SLEPC)
     set(_petsc_cflags -std=gnu17)
     set(_petsc_with_mpi 1)
     set(_petsc_scalar_type real)
+    set(_petsc_cxx_dialect C++11)
     set(_petsc_mpi_args)
     set(_petsc_clean_env ${CMAKE_COMMAND} -E env --unset=MAKEFLAGS)
-    set(_petsc_mumps_args
-      --download-mumps=1
-      --download-scalapack=1
-      --download-scalapack-cmake-arguments=-DCMAKE_C_STANDARD=17
-      --download-metis=1
-      --download-parmetis=1
-    )
+    set(_petsc_direct_solver_args)
+    if(WGMS3D_PETSC_DIRECT_SOLVER STREQUAL "MUMPS")
+      list(APPEND _petsc_direct_solver_args
+        --download-mumps=1
+        --download-scalapack=1
+        --download-scalapack-cmake-arguments=-DCMAKE_C_STANDARD=17
+        --download-metis=1
+        --download-parmetis=1
+      )
+    else()
+      list(APPEND _petsc_direct_solver_args
+        --download-superlu_dist=1
+        --download-metis=1
+        --download-parmetis=1
+      )
+    endif()
     set(_petsc_blaslapack_args --download-f2cblaslapack=1)
     if(WGMS3D_USE_SYSTEM_MPI)
       if(MPI_C_COMPILER)
@@ -268,6 +289,8 @@ if(WGMS3D_WITH_PETSC_SLEPC)
       set(_petsc_mpi_args --download-mpich=1)
     endif()
 
+    message(STATUS "Vendored PETSc direct solver backend: ${WGMS3D_PETSC_DIRECT_SOLVER}")
+
     if(WGMS3D_VENDOR_PETSC_COMPLEX)
       set(_petsc_scalar_type complex)
     endif()
@@ -275,10 +298,16 @@ if(WGMS3D_WITH_PETSC_SLEPC)
     set(_petsc_cuda_args)
     if(WGMS3D_WITH_CUDA)
       list(APPEND _petsc_cuda_args --with-cuda=1)
+      if(WGMS3D_PETSC_DIRECT_SOLVER STREQUAL "SUPERLU_DIST")
+        # CUDA 13's CCCL stack (Thrust/CUB/libcu++) requires at least C++17.
+        set(_petsc_cxx_dialect C++17)
+      endif()
       if(WGMS3D_CUDA_ARCH)
         list(APPEND _petsc_cuda_args --with-cuda-arch=${WGMS3D_CUDA_ARCH})
       endif()
     endif()
+
+    message(STATUS "Vendored PETSc C++ dialect: ${_petsc_cxx_dialect}")
 
     ExternalProject_Add(petsc_ep
       URL https://github.com/petsc/petsc/archive/refs/tags/v${WGMS3D_PETSC_VERSION}.tar.gz
@@ -300,9 +329,9 @@ if(WGMS3D_WITH_PETSC_SLEPC)
           --with-x=0
           --with-mpi=${_petsc_with_mpi}
           --with-scalar-type=${_petsc_scalar_type}
-          --with-cxx-dialect=C++11
+          --with-cxx-dialect=${_petsc_cxx_dialect}
             ${_petsc_mpi_args}
-            ${_petsc_mumps_args}
+            ${_petsc_direct_solver_args}
           ${_petsc_blaslapack_args}
           ${_petsc_cuda_args}
       BUILD_COMMAND ${_petsc_clean_env} ${CMAKE_MAKE_PROGRAM}
@@ -411,6 +440,7 @@ target_compile_definitions(wgms3d PRIVATE
   $<$<BOOL:${WGMS3D_COMPILE_WITH_MPI}>:WGMS3D_WITH_MPI>
   $<$<BOOL:${WGMS3D_COMPILE_WITH_PETSC}>:WGMS3D_WITH_PETSC>
   $<$<BOOL:${WGMS3D_COMPILE_WITH_SLEPC}>:WGMS3D_WITH_SLEPC>
+  $<$<BOOL:${WGMS3D_COMPILE_WITH_PETSC_SUPERLU_DIST}>:WGMS3D_WITH_PETSC_SUPERLU_DIST>
   $<$<BOOL:${WGMS3D_WITH_CUDA}>:WGMS3D_WITH_CUDA>
 )
 target_compile_options(wgms3d PRIVATE -Wall -pedantic)
