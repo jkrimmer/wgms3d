@@ -211,15 +211,19 @@ namespace {
 			ierr = PCFactorSetMatSolverType(pc, MATSOLVERCUSPARSE); CHKERRXX(ierr);
 		}
 		else {
-#ifdef WGMS3D_WITH_PETSC_SUPERLU_DIST
+#if defined(WGMS3D_WITH_PETSC_SUPERLU_DIST)
 			ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST); CHKERRXX(ierr);
+#elif defined(WGMS3D_WITH_PETSC_UMFPACK)
+			ierr = PCFactorSetMatSolverType(pc, MATSOLVERUMFPACK); CHKERRXX(ierr);
 #else
 			ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
 #endif
 		}
 #else
-#ifdef WGMS3D_WITH_PETSC_SUPERLU_DIST
+#if defined(WGMS3D_WITH_PETSC_SUPERLU_DIST)
 		ierr = PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST); CHKERRXX(ierr);
+#elif defined(WGMS3D_WITH_PETSC_UMFPACK)
+		ierr = PCFactorSetMatSolverType(pc, MATSOLVERUMFPACK); CHKERRXX(ierr);
 #else
 		ierr = PCFactorSetMatSolverType(pc, MATSOLVERMUMPS); CHKERRXX(ierr);
 #endif

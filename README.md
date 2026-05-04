@@ -64,6 +64,7 @@ cmake --install build
 - `WGMS3D_VENDOR_BLAS_LAPACK=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_SLEPC=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_COMPLEX=ON|OFF` (default: `ON`)
+- `WGMS3D_PETSC_DIRECT_SOLVER=MUMPS|SUPERLU_DIST|UMFPACK` (default: `MUMPS`) — direct sparse solver used by vendored PETSc
 - `WGMS3D_WITH_CUDA=ON|OFF` (default: `OFF`) — enable CUDA backend (PETSc/SLEPc only)
 - `WGMS3D_CUDA_ARCH=<sm_XX>` — pin CUDA architecture for vendored PETSc build (e.g. `sm_80`)
 
@@ -92,6 +93,28 @@ cmake --build build -j
 
 When `WGMS3D_VENDOR_PETSC_SLEPC=ON` and no system MPI is available, MPICH is
 fetched automatically for the vendored PETSc build.
+
+#### Direct sparse solver (`WGMS3D_PETSC_DIRECT_SOLVER`)
+
+The shift-and-invert step inside SLEPc requires a direct LU factorization.
+Three choices are available via `WGMS3D_PETSC_DIRECT_SOLVER` (only relevant
+when `WGMS3D_VENDOR_PETSC_SLEPC=ON`; with a system PETSc the solver embedded
+in that build is used instead):
+
+| Value | Library downloaded by PETSc | MPI-parallel LU? | Notes |
+|---|---|---|---|
+| `MUMPS` (default) | MUMPS + ScaLAPACK + METIS + ParMETIS | yes | Best choice for multi-process runs |
+| `SUPERLU_DIST` | SuperLU_DIST + METIS + ParMETIS | yes | Alternative parallel direct solver |
+| `UMFPACK` | SuiteSparse (UMFPACK) + METIS | no (sequential) | Not suitable for MPI |
+
+Example — build with UMFPACK as the factorization backend:
+```bash
+cmake -B build \
+    -DWGMS3D_WITH_PETSC_SLEPC=ON \
+    -DWGMS3D_VENDOR_PETSC_SLEPC=ON \
+    -DWGMS3D_PETSC_DIRECT_SOLVER=UMFPACK
+cmake --build build -j
+```
 
 Vendored PETSc optimization flags, i.e.
 - `WGMS3D_PETSC_COPTFLAGS`
