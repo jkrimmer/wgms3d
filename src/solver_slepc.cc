@@ -167,20 +167,20 @@ namespace {
 
 	    PetscPrintf(PETSC_COMM_WORLD, "Converting matrix to PETSc format...\n");
 
-	    // parallelize matrix insertion (Sonnet 4.6)
-		PetscInt row_start, row_end;
-		MatGetOwnershipRange(mat, &row_start, &row_end);
-
-		for (unsigned int i = 0; i < matrix->length; i++) {
-			PetscInt x = matrix->entries[i].i;
-			if (x >= row_start && x < row_end) {  // only insert locally owned rows
+	    // TODO: parallelize (for example, make sparse_matrix a
+	    // wrapper for PETSc matrix).
+	    if(rank == 0)
+	    {
+			// TODO: speed this up.
+			matrix->order(1);
+			for(unsigned int i = 0; i < matrix->length; i++)
+			{
+				PetscInt x = matrix->entries[i].i;
 				PetscInt y = matrix->entries[i].j;
-				PetscScalar value = wgms3d::maybeConvertComplexToReal(
-					matrix->entries[i].v, PetscScalar());
-				ierr = MatSetValues(mat, 1, &x, 1, &y, &value, INSERT_VALUES);
-				CHKERRXX(ierr);
+				PetscScalar value = wgms3d::maybeConvertComplexToReal(matrix->entries[i].v, PetscScalar());
+				ierr = MatSetValues(mat, 1, &x, 1, &y, &value, INSERT_VALUES); CHKERRXX(ierr);
 			}
-		}
+	    }
 	    matrix.reset();
 
 	    ierr = MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY); CHKERRXX(ierr);
