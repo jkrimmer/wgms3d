@@ -64,6 +64,7 @@ cmake --install build
 - `WGMS3D_VENDOR_BLAS_LAPACK=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_SLEPC=ON|OFF`
 - `WGMS3D_VENDOR_PETSC_COMPLEX=ON|OFF` (default: `ON`)
+- `WGMS3D_VENDOR_MPI=ON|OFF` (default: `OFF`) - force vendored MPI
 - `WGMS3D_PETSC_DIRECT_SOLVER=MUMPS|SUPERLU_DIST|UMFPACK` (default: `MUMPS`) — direct sparse solver used by vendored PETSc
 - `WGMS3D_WITH_CUDA=ON|OFF` (default: `OFF`) — enable CUDA backend (PETSc/SLEPc only)
 - `WGMS3D_CUDA_ARCH=<sm_XX>` — pin CUDA architecture for vendored PETSc build (e.g. `sm_80`)
